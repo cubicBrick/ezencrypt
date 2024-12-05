@@ -3,7 +3,6 @@ from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives import serialization, hashes
 
-
 def rsa_encrypt_fernet_key(public_key, fernet_key: bytes) -> bytes:
     """
     Encrypt a Fernet key using an RSA public key.
