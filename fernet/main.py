@@ -9,6 +9,8 @@ def yesNo(prompt : str)-> (bool | None):
     if i in nokw:
         return False
     return None
+
+
 print("Welcome to the Fernet system!")
 
 while 1:
