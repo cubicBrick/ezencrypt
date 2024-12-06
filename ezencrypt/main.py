@@ -11,14 +11,15 @@ from cryptography.hazmat.primitives.asymmetric.rsa import (
     RSAPrivateKey,
 )
 from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.serialization import load_pem_public_key
 import os
 
-CONFIG_PATH = "config/keys.json"
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config\\keys.json")
 
 
 class ManageKeysDialog(simpledialog.Dialog):
     def __init__(self, parent, title="Manage Keys"):
-        self.allkeys = self.load_keys()
+        self.listkeys = self.load_keys()
         self.parent = parent
         super().__init__(parent, title)
 
@@ -33,29 +34,45 @@ class ManageKeysDialog(simpledialog.Dialog):
         button_frame = tk.Frame(master)
         button_frame.pack(pady=10)
 
-        tk.Button(button_frame, text="Add Key", command=self.add_key).pack(side="left", padx=5)
-        tk.Button(button_frame, text="Remove Key", command=self.remove_key).pack(side="left", padx=5)
-        tk.Button(button_frame, text="Edit Key", command=self.edit_key).pack(side="left", padx=5)
-        self.share_button = tk.Button(button_frame, text="Share", command=self.share_key, state="disabled")
+        tk.Button(button_frame, text="Add Key", command=self.add_key).pack(
+            side="left", padx=5
+        )
+        tk.Button(button_frame, text="Remove Key", command=self.remove_key).pack(
+            side="left", padx=5
+        )
+        tk.Button(button_frame, text="Edit Key", command=self.edit_key).pack(
+            side="left", padx=5
+        )
+        self.share_button = tk.Button(
+            button_frame, text="Share", command=self.share_key, state="disabled"
+        )
         self.share_button.pack(side="left", padx=5)
 
         # Bind selection event
         self.key_list.bind("<<ListboxSelect>>", self.on_key_select)
 
     def load_keys(self):
-        if os.path.exists(CONFIG_PATH):
+        if not os.path.exists(CONFIG_PATH):
+            with open(CONFIG_PATH, "w") as file:
+                json.dump([], file)  # Initialize with an empty list
+            return []
+        try:
             with open(CONFIG_PATH, "r") as file:
                 return json.load(file)
-        return []
+        except json.JSONDecodeError:
+            # Handle corrupted or empty file
+            with open(CONFIG_PATH, "w") as file:
+                json.dump([], file)  # Reinitialize the file
+            return []
 
     def save_keys(self):
         with open(CONFIG_PATH, "w") as file:
-            json.dump(self.keys, file, indent=2)
+            json.dump(self.listkeys, file, indent=2)
 
     def refresh_keys(self):
         self.key_list.delete(0, tk.END)
-        for key in self.keys:
-            self.key_list.insert(tk.END, f"{key['title']} ({key['type']})")
+        for key in self.listkeys:
+            self.key_list.insert(tk.END, f"{key['title']}")
 
     def on_key_select(self, event):
         # Enable or disable the Share button based on selection
@@ -63,8 +80,8 @@ class ManageKeysDialog(simpledialog.Dialog):
         if not selected:
             self.share_button.config(state="disabled")
             return
-        selected_key = self.keys[selected[0]]
-        if selected_key["type"] == "private":  # "both" has a private key entry
+        selected_key = self.listkeys[selected[0]]
+        if selected_key["type"] == "public":
             self.share_button.config(state="normal")
         else:
             self.share_button.config(state="disabled")
@@ -73,11 +90,13 @@ class ManageKeysDialog(simpledialog.Dialog):
         selected = self.key_list.curselection()
         if not selected:
             return
-        selected_key = self.keys[selected[0]]
+        selected_key = self.listkeys[selected[0]]
 
         # Locate the corresponding public key
-        public_key_title = f"{selected_key['title']}_public"
-        public_key = next((k for k in self.keys if k["title"] == public_key_title), None)
+        public_key_title = f"{selected_key['title']}"
+        public_key = next(
+            (k for k in self.listkeys if k["title"] == public_key_title), None
+        )
         if not public_key:
             messagebox.showerror("Error", "Public key not found!")
             return
@@ -94,18 +113,20 @@ class ManageKeysDialog(simpledialog.Dialog):
         tk.Button(dialog, text="Close", command=dialog.destroy).pack(pady=5)
 
     def add_key(self):
-        title = simpledialog.askstring("Add Key", "Enter a title for the key:").replace("-", "_")
+        title = simpledialog.askstring(
+            "Add Key", "Enter a title for the key:", parent=self
+        ).replace("-", "_")
         if not title:
             return
         key_type = simpledialog.askstring(
-            "Add Key", "Enter the key type (both/public):", parent=self.parent
+            "Add Key", "Enter the key type (new/public):", parent=self
         )
-        if key_type not in ["both", "public"]:
+        if key_type not in ["new", "public"]:
             messagebox.showerror("Error", "Invalid key type!")
             return
-        if key_type == "both":
+        if key_type == "new":
             password = simpledialog.askstring(
-                "Add Key", "Enter a password for the key:", show="*", parent=self.parent
+                "Add Key", "Enter a password for the key:", show="*", parent=self
             )
             key = generate_private_key(public_exponent=65537, key_size=2048)
             key_bytes = key.private_bytes(
@@ -116,17 +137,43 @@ class ManageKeysDialog(simpledialog.Dialog):
                 ),
             )
             publicKey = key.public_key()
-            self.keys.append({"title": title, "type": key_type})
-            self.save_keys()
-        else:
-            private_key = generate_private_key(public_exponent=65537, key_size=2048)
-            key = private_key.public_key()
-            key_bytes = key.public_bytes(
-                encoding=serialization.Encoding.PEM,
-                format=serialization.PublicFormat.SubjectPublicKeyInfo,
+            self.listkeys.append(
+                {
+                    "title": title + " - private",
+                    "type": "private",
+                    "key": key_bytes.decode(),
+                }
             )
-
-        self.keys().append({"title": title, "type": key_type, "key": key_bytes.decode()})
+            self.listkeys.append(
+                {
+                    "title": title + " - public",
+                    "type": "public",
+                    "key": publicKey.public_bytes(
+                        encoding=serialization.Encoding.PEM,
+                        format=serialization.PublicFormat.PKCS1,
+                    ).decode(),
+                }
+            )
+        else:
+            key = LargeInputDialog(
+                self,
+                "Key Input",
+                "Enter the public key (should start with -----BEGIN PUBLIC KEY-----)",
+            ).get_input()
+            try:
+                key_bytes = load_pem_public_key(key.encode())
+                self.listkeys.append(
+                    {
+                        "title": title + " - public",
+                        "type": "public",
+                        "key": key_bytes.public_bytes(
+                            encoding=serialization.Encoding.PEM,
+                            format=serialization.PublicFormat.PKCS1,
+                        ).decode(),
+                    }
+                )
+            except ValueError:
+                messagebox.showerror(APP_NAME, "You have supplied an invalid key!")
         self.save_keys()
         self.refresh_keys()
 
@@ -135,7 +182,7 @@ class ManageKeysDialog(simpledialog.Dialog):
         if not selected:
             messagebox.showerror("Error", "No key selected!")
             return
-        del self.keys[selected[0]]
+        del self.listkeys[selected[0]]
         self.save_keys()
         self.refresh_keys()
 
@@ -144,7 +191,7 @@ class ManageKeysDialog(simpledialog.Dialog):
         if not selected:
             messagebox.showerror("Error", "No key selected!")
             return
-        key = self.keys[selected[0]]
+        key = self.listkeys[selected[0]]
         new_title = simpledialog.askstring(
             "Edit Key", "Enter a new title for the key:", initialvalue=key["title"]
         )
@@ -198,46 +245,213 @@ class LargeInputDialog(simpledialog.Dialog):
         return self.input_text
 
 
-APP_NAME = "Secure Encrypt Application"
+APP_NAME = "Secure Encryption/Decryption Application"
 
 
 class mainWindow:
     def __init__(self, root: tk.Tk):
         self.root = root
-        self.root.geometry("600x400")
+        self.root.geometry("400x300")
         self.root.resizable = True
         self.root.title(APP_NAME)
         self.encryptButton = tk.Button(
-            root, text="Encrypt Message", command=self.encrypt, width=20, height=2
+            root, text="Encrypt Message", command=self.encrypt, width=20
         ).pack(pady=10)
-        self.decyrptButton = tk.Button(
+        self.decryptButton = tk.Button(
+            root, text="Decrypt Message", command=self.decrypt, width=20
+        ).pack(pady=10)
+        self.managekeys = tk.Button(
             root, text="Manage Keys", command=self.manage_keys, width=20
         ).pack(pady=10)
 
+    def load_keys(self):
+        if not os.path.exists(CONFIG_PATH):
+            with open(CONFIG_PATH, "w") as file:
+                json.dump([], file)  # Initialize with an empty list
+            return []
+        try:
+            with open(CONFIG_PATH, "r") as file:
+                return json.load(file)
+        except json.JSONDecodeError:
+            # Handle corrupted or empty file
+            with open(CONFIG_PATH, "w") as file:
+                json.dump([], file)  # Reinitialize the file
+            return []
+
     def encrypt(self):
-        # Create a dialog to get the text to encrypt
+        # Prompt user to enter the message to encrypt
         msg = LargeInputDialog(
             self.root, APP_NAME, "Enter your text to encrypt"
         ).get_input()
-        pwd = simpledialog.askstring(
-            APP_NAME, "Enter your password:", show="*", parent=root
+        if not msg:
+            messagebox.showerror(APP_NAME, "No message provided for encryption!")
+            return
+
+        # Fetch available public keys
+        keys = [key for key in self.load_keys() if key["type"] == "public"]
+        if not keys:
+            messagebox.showerror(APP_NAME, "No public keys available! Please add one.")
+            return
+
+        # Create a dialog for selecting a public key
+        select_dialog = tk.Toplevel(self.root)
+        select_dialog.transient(self.root)
+        sele
+        select_dialog.title("Select Public Key")
+        tk.Label(select_dialog, text="Select a public key for encryption:").pack(
+            pady=10
         )
-        keys = None
-        with open("/config/keys.txt") as f:
-            data = f.read()
-        keyid = simpledialog.askstring(
-            APP_NAME, "Enter which key to use. You have saved the following keys:\n"
+
+        key_titles = [key["title"] for key in keys]
+        selected_key = tk.StringVar()
+        key_dropdown = ttk.Combobox(
+            select_dialog,
+            values=key_titles,
+            state="readonly",
+            textvariable=selected_key,
         )
-        if pwd:
-            encrypted = rsa_fernet_encrypt()
-        else:
-            simpledialog.SimpleDialog(root, "Password not provided!")
+        key_dropdown.pack(pady=10)
+        key_dropdown.current(0)  # Default to the first key
+
+        def confirm_selection():
+            select_dialog.destroy()
+
+        tk.Button(select_dialog, text="OK", command=confirm_selection).pack(pady=5)
+
+        # Wait for the dialog to close
+        select_dialog.transient(self.root)
+        self.root.wait_window(select_dialog)
+
+        selected_key_title = selected_key.get()
+        if not selected_key_title:
+            messagebox.showerror(APP_NAME, "No key selected!")
+            return
+
+        # Retrieve the selected key
+        selected_key_data = next(
+            key for key in keys if key["title"] == selected_key_title
+        )
+        public_key_pem = selected_key_data["key"]
+        try:
+            public_key = serialization.load_pem_public_key(public_key_pem.encode())
+        except Exception as e:
+            messagebox.showerror(APP_NAME, f"Failed to load the public key: {e}")
+            return
+
+        # Encrypt the message
+        try:
+            encrypted_message = rsa_fernet_encrypt(public_key, msg)
+        except Exception as e:
+            messagebox.showerror(APP_NAME, f"Encryption failed: {e}")
+            return
+
+        # Display the encrypted message
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Encrypted Message")
+        tk.Label(dialog, text="Your encrypted message:").pack(pady=10)
+        text = tk.Text(dialog, wrap="word", width=80, height=10)
+        text.insert("1.0", encrypted_message)
+        text.config(state="disabled")  # Make it read-only
+        text.pack(pady=10)
+        tk.Button(dialog, text="Close", command=dialog.destroy).pack(pady=5)
+
+    def decrypt(self):
+        # Prompt user to enter the encrypted message
+        encrypted_message = LargeInputDialog(
+            self.root, APP_NAME, "Enter the encrypted message:"
+        ).get_input()
+        if not encrypted_message:
+            messagebox.showerror(APP_NAME, "No encrypted message provided!")
+            return
+
+        # Fetch available private keys
+        keys = [key for key in self.load_keys() if key["type"] == "private"]
+        if not keys:
+            messagebox.showerror(APP_NAME, "No private keys available! Please add one.")
+            return
+
+        # Create a dialog for selecting a private key
+        select_dialog = tk.Toplevel(self.root)
+        select_dialog.transient(self.root)
+        select_dialog.title("Select Private Key")
+        tk.Label(select_dialog, text="Select a private key for decryption:").pack(
+            pady=10
+        )
+
+        key_titles = [key["title"] for key in keys]
+        selected_key = tk.StringVar()
+        key_dropdown = ttk.Combobox(
+            select_dialog,
+            values=key_titles,
+            state="readonly",
+            textvariable=selected_key,
+        )
+        key_dropdown.pack(pady=10)
+        key_dropdown.current(0)
+
+        def confirm_selection():
+            select_dialog.destroy()
+
+        tk.Button(select_dialog, text="OK", command=confirm_selection).pack(pady=5)
+
+        # Wait for the dialog to close
+        select_dialog.transient(self.root)
+        select_dialog.grab_set()
+        self.root.wait_window(select_dialog)
+
+        selected_key_title = selected_key.get()
+        if not selected_key_title:
+            messagebox.showerror(APP_NAME, "No key selected!")
+            return
+
+        # Retrieve the selected key
+        selected_key_data = next(
+            key for key in keys if key["title"] == selected_key_title
+        )
+        private_key_pem = selected_key_data["key"]
+
+        # Prompt for the private key password
+        password = simpledialog.askstring(
+            APP_NAME, "Enter the password for the private key:", show="*"
+        )
+        if not password:
+            messagebox.showerror(APP_NAME, "No password provided for the private key!")
+            return
+
+        # Load the private key
+        try:
+            private_key = serialization.load_pem_private_key(
+                private_key_pem.encode(),
+                password=password.encode(),
+            )
+        except Exception as e:
+            messagebox.showerror(APP_NAME, f"Failed to load the private key: {e}")
+            return
+
+        # Decrypt the message
+        try:
+            decrypted_message = rsa_fernet_decrypt(private_key, encrypted_message)
+        except Exception as e:
+            messagebox.showerror(APP_NAME, f"Decryption failed: {e}")
+            return
+
+        # Display the decrypted message
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Decrypted Message")
+        tk.Label(dialog, text="Your decrypted message:").pack(pady=10)
+        text = tk.Text(dialog, wrap="word", width=80, height=10)
+        text.insert("1.0", decrypted_message)
+        text.config(state="disabled")  # Make it read-only
+        text.pack(pady=10)
+        tk.Button(dialog, text="Close", command=dialog.destroy).pack(pady=5)
 
     def manage_keys(self):
         ManageKeysDialog(self.root)
 
 
 if __name__ == "__main__":
+    if not os.path.exists(CONFIG_PATH):
+        raise Exception(CONFIG_PATH + " file not found. Consider adding the file.")
     root = tk.Tk()
     app = mainWindow(root)
     root.mainloop()

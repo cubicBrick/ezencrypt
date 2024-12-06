@@ -1,2 +1,2 @@
 import os
-os.system("pip install cryptography keyring werkzeug tkinter --user") 
+os.system("pip install cryptography keyring werkzeug --user") 
