@@ -450,7 +450,7 @@ class mainWindow:
 
 if __name__ == "__main__":
     if not os.path.exists(CONFIG_PATH):
-        raise Exception(CONFIG_PATH + " file not found. Consider adding the file.")
+        open(CONFIG_PATH, 'x').close()
     root = tk.Tk()
     app = mainWindow(root)
     root.mainloop()
