@@ -1,3 +1,19 @@
+#   main.py : The main program
+#   Copyright (C) 2024  cubicBrick (GitHub account)
+
+#   This program is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 3 of the License, or
+#   (at your option) any later version.
+
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+
+#   You should have received a copy of the GNU General Public License
+#   along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import json
 import base64
 from pyperclip import copy
@@ -327,6 +343,7 @@ class mainWindow:
                 enc = f.encrypt(cnf.read().encode()).decode()
                 cnfenc.write(enc)
                 cnfenc.flush()
+        init()
         self.root.destroy()
         new_root = tk.Tk()
         mainWindow(new_root)
@@ -344,6 +361,7 @@ class mainWindow:
         with open(CONFIGENC_PATH, "w", encoding="utf-8") as cnfenc:
             with open(CONFIG_PATH, "r") as cnf:
                 cnfenc.write(cnf.read())
+        init()
         self.root.destroy()
         new_root = tk.Tk()
         mainWindow(new_root)
@@ -630,8 +648,7 @@ class mainWindow:
     def manage_keys(self):
         ManageKeysDialog(self.root)
 
-
-if __name__ == "__main__":
+def init():
     try:
         if not os.path.exists(CONFIG_PATH):
             open(CONFIG_PATH, "x").close()
@@ -657,9 +674,6 @@ if __name__ == "__main__":
             with open(CONFIGENC_PATH, "r") as cenc:
                 with open(CONFIG_PATH, "w") as file:
                     file.write(cenc.read())
-        root = tk.Tk()
-        app = mainWindow(root)
-        root.mainloop()
     except Exception:
         messagebox.showerror(
             APP_NAME,
@@ -683,3 +697,9 @@ if __name__ == "__main__":
             pass
 
         messagebox.showinfo(APP_NAME, "Finished wiping file(s).")
+
+if __name__ == "__main__":
+    init()
+    root = tk.Tk()
+    app = mainWindow(root)
+    root.mainloop()

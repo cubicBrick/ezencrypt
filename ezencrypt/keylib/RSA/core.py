@@ -1,3 +1,19 @@
+#   keylib/RSA/core.py : RSA key signing and encryption helpers
+#   Copyright (C) 2024  cubicBrick (GitHub account)
+
+#   This program is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 3 of the License, or
+#   (at your option) any later version.
+
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+
+#   You should have received a copy of the GNU General Public License
+#   along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import base64
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
@@ -18,10 +34,10 @@ def sign_message(private_key, message: bytes) -> bytes:
     return private_key.sign(
         message,
         padding.PSS(
-            mgf=padding.MGF1(hashes.SHA3_512()),
+            mgf=padding.MGF1(hashes.SHA256()),
             salt_length=padding.PSS.MAX_LENGTH,
         ),
-        hashes.SHA3_512(),
+        hashes.SHA256(),
     )
 
 def rsa_encrypt_fernet_key(public_key, fernet_key: bytes) -> bytes:
@@ -38,8 +54,8 @@ def rsa_encrypt_fernet_key(public_key, fernet_key: bytes) -> bytes:
     return public_key.encrypt(
         fernet_key,
         padding.OAEP(
-            mgf=padding.MGF1(algorithm=hashes.SHA3_512()),
-            algorithm=hashes.SHA3_512(),
+            mgf=padding.MGF1(algorithm=hashes.SHA256()),
+            algorithm=hashes.SHA256(),
             label=None
         )
     )
@@ -59,8 +75,8 @@ def rsa_decrypt_fernet_key(private_key, encrypted_fernet_key: bytes) -> bytes:
     return private_key.decrypt(
         encrypted_fernet_key,
         padding.OAEP(
-            mgf=padding.MGF1(algorithm=hashes.SHA3_512()),
-            algorithm=hashes.SHA3_512(),
+            mgf=padding.MGF1(algorithm=hashes.SHA256()),
+            algorithm=hashes.SHA256(),
             label=None
         )
     )
@@ -90,7 +106,7 @@ def rsa_fernet_encrypt(public_key, private_key, message: str) -> str:
     fernet_encrypted_message = fernet.encrypt(message.encode())
 
     # Compute the hash of the encrypted message and sign it
-    message_hash = hashes.Hash(hashes.SHA3_512())
+    message_hash = hashes.Hash(hashes.SHA256())
     message_hash.update(fernet_encrypted_message)
     digest = message_hash.finalize()
     signature = sign_message(private_key, digest)
@@ -119,10 +135,10 @@ def verify_signature(public_key, message: bytes, signature: bytes) -> bool:
             signature,
             message,
             padding.PSS(
-                mgf=padding.MGF1(hashes.SHA3_512()),
+                mgf=padding.MGF1(hashes.SHA256()),
                 salt_length=padding.PSS.MAX_LENGTH,
             ),
-            hashes.SHA3_512(),
+            hashes.SHA256(),
         )
         return True
     except Exception:
@@ -156,7 +172,7 @@ def rsa_fernet_decrypt(private_key, public_key, encrypted_data: str) -> str:
     fernet = Fernet(fernet_key)
 
     # Verify the signature
-    message_hash = hashes.Hash(hashes.SHA3_512())
+    message_hash = hashes.Hash(hashes.SHA256())
     message_hash.update(fernet_encrypted_message)
     digest = message_hash.finalize()
 
