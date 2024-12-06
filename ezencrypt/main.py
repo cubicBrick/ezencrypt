@@ -1,4 +1,5 @@
 import json
+import base64
 from pyperclip import copy
 import tkinter as tk
 from tkinter import messagebox, dialog, ttk, simpledialog
@@ -6,16 +7,22 @@ from keyring import set_password, set_keyring
 from keylib.RSA import rsa_fernet_encrypt, rsa_fernet_decrypt
 from cryptography.hazmat.primitives.asymmetric.rsa import (
     generate_private_key,
-    RSAPrivateKeyWithSerialization,
-    RSAPublicKeyWithSerialization,
-    RSAPublicKey,
-    RSAPrivateKey,
 )
+from time import sleep
+from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.serialization import load_pem_public_key
 import os
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config\\keys.json")
+encrypted_PATH = os.path.join(os.path.dirname(__file__), "config\\enc.txt")
+SALT_PATH = os.path.join(os.path.dirname(__file__), "config\\salt.txt")
+CONFIGENC_PATH = os.path.join(os.path.dirname(__file__), "config\\keysenc.txt")
+
+with open(encrypted_PATH, "r") as f:
+    encrypted = f.read() == "1"
 
 
 class ManageKeysDialog(simpledialog.Dialog):
@@ -181,7 +188,15 @@ class ManageKeysDialog(simpledialog.Dialog):
     def remove_key(self):
         selected = self.key_list.curselection()
         if not selected:
-            messagebox.showerror("Error", "No key selected!")
+            messagebox.showerror(APP_NAME, "No key selected!")
+            return
+        if not messagebox.askyesno(
+            APP_NAME,
+            "Are you sure you want to remove the following key:\n"
+            + str(
+                self.listkeys[selected[0]]["title"] + "\nThis action is irriversable!"
+            ),
+        ):
             return
         del self.listkeys[selected[0]]
         self.save_keys()
@@ -190,11 +205,11 @@ class ManageKeysDialog(simpledialog.Dialog):
     def edit_key(self):
         selected = self.key_list.curselection()
         if not selected:
-            messagebox.showerror("Error", "No key selected!")
+            messagebox.showerror(APP_NAME, "No key selected!")
             return
         key = self.listkeys[selected[0]]
         new_title = simpledialog.askstring(
-            "Edit Key", "Enter a new title for the key:", initialvalue=key["title"]
+            APP_NAME, "Enter a new title for the key:", initialvalue=key["title"]
         )
         if new_title:
             key["title"] = new_title
@@ -264,6 +279,75 @@ class mainWindow:
         self.managekeys = tk.Button(
             root, text="Manage Keys", command=self.manage_keys, width=20
         ).pack(pady=10)
+        self.saveallbutton = tk.Button(
+            root, text="Save all Changes", command=self.saveAll, width=20
+        ).pack(pady=10)
+        if encrypted:
+            tk.Button(
+                root, text="Modify Master Key", command=self.modifyMasterKey, width=20
+            ).pack(pady=10)
+            tk.Button(
+                root, text="Remove Master Key", command=self.removeMasterKey, width=20
+            ).pack(pady=10)
+        else:
+            tk.Button(
+                root, text="Add Master Key", command=self.addMasterKey, width=20
+            ).pack(pady=10)
+
+    def modifyMasterKey(self):
+        self.addMasterKey()
+
+    def addMasterKey(self):
+        if not messagebox.askyesno(
+            APP_NAME,
+            "After adding/changing a master key, this program will restart.\nWARNING: If you forget the master key, you will lose all your information.",
+        ):
+            return
+        pwd = simpledialog.askstring(
+            APP_NAME, "Enter the new master key password", show="*"
+        )
+        if not pwd:
+            return
+        with open(encrypted_PATH, "w") as f:
+            f.write("1")
+        encrypted = True
+        salt = os.urandom(16)
+        with open(SALT_PATH, "wb") as f:
+            f.write(salt)
+        kdf = PBKDF2HMAC(
+            hashes.SHA3_512(),
+            32,
+            salt,
+            480000,
+        )
+        key = base64.urlsafe_b64encode(kdf.derive(pwd.encode()))
+        f = Fernet(key)
+        with open(CONFIGENC_PATH, "w", encoding="utf-8") as cnfenc:
+            with open(CONFIG_PATH, "r") as cnf:
+                enc = f.encrypt(cnf.read().encode()).decode()
+                cnfenc.write(enc)
+                cnfenc.flush()
+        self.root.destroy()
+        new_root = tk.Tk()
+        mainWindow(new_root)
+        new_root.mainloop()
+
+    def removeMasterKey(self):
+        checkStr = int.from_bytes(os.urandom(2))
+        if not simpledialog.askstring(
+            APP_NAME,
+            "Are you sure you want to destroy your master key?\nType "
+            + str(checkStr)
+            + " to verify",
+        ) == str(checkStr):
+            return
+        with open(CONFIGENC_PATH, "w", encoding="utf-8") as cnfenc:
+            with open(CONFIG_PATH, "r") as cnf:
+                cnfenc.write(cnf.read())
+        self.root.destroy()
+        new_root = tk.Tk()
+        mainWindow(new_root)
+        new_root.mainloop()
 
     def load_keys(self):
         if not os.path.exists(CONFIG_PATH):
@@ -354,7 +438,9 @@ class mainWindow:
         text.config(state="disabled")  # Make it read-only
         text.pack(pady=10)
         tk.Button(dialog, text="Close", command=dialog.destroy).pack(pady=5)
-        tk.Button(dialog, text="Copy to clipboard", command=copy(encrypted_message)).pack(pady=5)
+        tk.Button(
+            dialog, text="Copy to clipboard", command=copy(encrypted_message)
+        ).pack(pady=5)
 
     def decrypt(self):
         # Prompt user to enter the encrypted message
@@ -446,13 +532,82 @@ class mainWindow:
         text.pack(pady=10)
         tk.Button(dialog, text="Close", command=dialog.destroy).pack(pady=5)
 
+    def saveAll(self):
+        if encrypted:
+            pwd = simpledialog.askstring(APP_NAME, "Enter the master password")
+            salt = os.urandom(16)
+            with open(SALT_PATH, "wb") as f:
+                f.write(salt)
+            kdf = PBKDF2HMAC(
+                hashes.SHA3_512(),
+                32,
+                salt,
+                480000,
+            )
+            key = base64.urlsafe_b64encode(kdf.derive(pwd.encode()))
+            f = Fernet(key)
+            with open(CONFIGENC_PATH, "w") as cnfenc:
+                with open(CONFIG_PATH, "r") as cnf:
+                    cnfenc.write(f.encrypt(cnf.read()).decode())
+        else:
+            with open(CONFIG_PATH, "r") as cnf:
+                with open(CONFIGENC_PATH, "w") as cnfenc:
+                    cnfenc.write(cnf.read())
+        messagebox.showinfo(APP_NAME, "Changes saved!")
+
     def manage_keys(self):
         ManageKeysDialog(self.root)
 
 
 if __name__ == "__main__":
-    if not os.path.exists(CONFIG_PATH):
-        open(CONFIG_PATH, 'x').close()
-    root = tk.Tk()
-    app = mainWindow(root)
-    root.mainloop()
+    try:
+        if not os.path.exists(CONFIG_PATH):
+            open(CONFIG_PATH, "x").close()
+        if encrypted:
+            pwd = simpledialog.askstring(
+                APP_NAME, "Please enter the master password", show="*"
+            )
+            salt = b""
+            with open(SALT_PATH, "rb") as f:
+                salt = f.read()
+            kdf = PBKDF2HMAC(
+                hashes.SHA3_512(),
+                32,
+                salt,
+                480000,
+            )
+            key = base64.urlsafe_b64encode(kdf.derive(pwd.encode()))
+            f = Fernet(key)
+            with open(CONFIGENC_PATH, "rb") as cenc:
+                with open(CONFIG_PATH, "w") as file:
+                    file.write(f.decrypt(cenc.read()).decode())
+        else:
+            with open(CONFIGENC_PATH, "r") as cenc:
+                with open(CONFIG_PATH, "w") as file:
+                    file.write(cenc.read())
+        root = tk.Tk()
+        app = mainWindow(root)
+        root.mainloop()
+    except Exception:
+        messagebox.showerror(
+            APP_NAME,
+            f"There was an error!{"\nYou may have entered the incorrect password." if encrypted else ""}",
+        )
+    finally:
+        messagebox.showwarning(
+            APP_NAME,
+            "Press OK to start securly wiping key file(s)\nDo not end the program\nIt may take a while",
+        )
+        OVERWRITE_LEN = 1000000
+        with open(CONFIG_PATH, "wb") as f:
+            f.write(b"\x00" * OVERWRITE_LEN)
+            f.seek(0)
+            for i in range(100):
+                f.write(os.urandom(int(OVERWRITE_LEN)))
+                f.flush()
+                f.seek(0)
+            f.write(b"\x00" * OVERWRITE_LEN)
+        with open(CONFIG_PATH, "w"):
+            pass
+
+        messagebox.showinfo(APP_NAME, "Finished wiping file(s).")
