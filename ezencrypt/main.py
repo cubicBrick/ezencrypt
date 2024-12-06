@@ -296,7 +296,6 @@ class mainWindow:
         # Create a dialog for selecting a public key
         select_dialog = tk.Toplevel(self.root)
         select_dialog.transient(self.root)
-        sele
         select_dialog.title("Select Public Key")
         tk.Label(select_dialog, text="Select a public key for encryption:").pack(
             pady=10
