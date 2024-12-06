@@ -1,4 +1,5 @@
 import json
+from pyperclip import copy
 import tkinter as tk
 from tkinter import messagebox, dialog, ttk, simpledialog
 from keyring import set_password, set_keyring
@@ -353,6 +354,7 @@ class mainWindow:
         text.config(state="disabled")  # Make it read-only
         text.pack(pady=10)
         tk.Button(dialog, text="Close", command=dialog.destroy).pack(pady=5)
+        tk.Button(dialog, text="Copy to clipboard", command=copy(encrypted_message)).pack(pady=5)
 
     def decrypt(self):
         # Prompt user to enter the encrypted message
