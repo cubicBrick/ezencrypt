@@ -31,13 +31,25 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.serialization import load_pem_public_key
 import os
+import sys
 
-CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config\\keys.json")
-encrypted_PATH = os.path.join(os.path.dirname(__file__), "config\\enc.txt")
-SALT_PATH = os.path.join(os.path.dirname(__file__), "config\\salt.txt")
-CONFIGENC_PATH = os.path.join(os.path.dirname(__file__), "config\\keysenc.txt")
+def resource_path(relative_path):
+    """Get the absolute path to a resource, accounting for PyInstaller."""
+    # If the app is running as a PyInstaller bundle
+    if getattr(sys, 'frozen', False):
+        base_path = os.path.dirname(sys.executable)
+    else:
+        # Otherwise, get the base path of the script
+        base_path = os.path.abspath(os.path.dirname(__file__))
+    return os.path.join(base_path, relative_path)
 
-with open(encrypted_PATH, "r") as f:
+CONFIG_PATH = resource_path("config\\keys.json")
+ENCRYPTED_PATH = resource_path("config\\enc.txt")
+SALT_PATH = resource_path("config\\salt.txt")
+CONFIGENC_PATH = resource_path("config\\keysenc.txt")
+ICON_PATH = resource_path("assets\\lock.png")
+SMALL_ICON_PATH = resource_path("assets\\lock1616.png")
+with open(ENCRYPTED_PATH, "r") as f:
     encrypted = f.read() == "1"
 
 
@@ -287,33 +299,28 @@ class mainWindow:
         self.root.resizable = True
         self.root.title(APP_NAME)
         self.encryptButton = tk.Button(
-            root, text="Encrypt Message", command=self.encrypt, width=20
+            root, text="Encrypt Message", command=self.encrypt, width=40
         ).pack(pady=10)
         self.decryptButton = tk.Button(
-            root, text="Decrypt Message", command=self.decrypt, width=20
+            root, text="Decrypt Message", command=self.decrypt, width=40
         ).pack(pady=10)
         self.managekeys = tk.Button(
-            root, text="Manage Keys", command=self.manage_keys, width=20
+            root, text="Manage Keys", command=self.manage_keys, width=40
         ).pack(pady=10)
         self.saveallbutton = tk.Button(
-            root, text="Save all Changes", command=self.saveAll, width=20
+            root, text="Save All Changes/Change Master Key", command=self.saveAll, width=40
         ).pack(pady=10)
         if encrypted:
             tk.Button(
-                root, text="Modify Master Key", command=self.modifyMasterKey, width=20
-            ).pack(pady=10)
-            tk.Button(
-                root, text="Remove Master Key", command=self.removeMasterKey, width=20
+                root, text="Remove Master Key", command=self.removeMasterKey, width=40
             ).pack(pady=10)
         else:
             tk.Button(
-                root, text="Add Master Key", command=self.addMasterKey, width=20
+                root, text="Add Master Key", command=self.addMasterKey, width=40
             ).pack(pady=10)
 
-    def modifyMasterKey(self):
-        self.addMasterKey()
-
     def addMasterKey(self):
+        global encrypted
         if not messagebox.askyesno(
             APP_NAME,
             "After adding/changing a master key, this program will restart.\nWARNING: If you forget the master key, you will lose all your information.",
@@ -324,12 +331,10 @@ class mainWindow:
         )
         if not pwd:
             return
-        with open(encrypted_PATH, "w") as f:
+        with open(ENCRYPTED_PATH, "w") as f:
             f.write("1")
         encrypted = True
         salt = os.urandom(16)
-        with open(SALT_PATH, "wb") as f:
-            f.write(salt)
         kdf = PBKDF2HMAC(
             hashes.SHA3_512(),
             32,
@@ -343,13 +348,21 @@ class mainWindow:
                 enc = f.encrypt(cnf.read().encode()).decode()
                 cnfenc.write(enc)
                 cnfenc.flush()
-        init()
+        with open(ENCRYPTED_PATH, "w") as f:
+            f.write("1")
+        with open(SALT_PATH, "wb") as f:
+            f.write(salt)
         self.root.destroy()
+        wipe()
+        if not init():
+            return
         new_root = tk.Tk()
+        new_root.iconphoto(False, tk.PhotoImage(file=ICON_PATH), tk.PhotoImage(file=SMALL_ICON_PATH))
         mainWindow(new_root)
         new_root.mainloop()
 
     def removeMasterKey(self):
+        global encrypted
         checkStr = int.from_bytes(os.urandom(2))
         if not simpledialog.askstring(
             APP_NAME,
@@ -361,9 +374,15 @@ class mainWindow:
         with open(CONFIGENC_PATH, "w", encoding="utf-8") as cnfenc:
             with open(CONFIG_PATH, "r") as cnf:
                 cnfenc.write(cnf.read())
-        init()
+        with open(ENCRYPTED_PATH, "w") as f:
+            f.write("0")
+        encrypted = False
         self.root.destroy()
+        wipe()
+        if not init():
+            return
         new_root = tk.Tk()
+        new_root.iconphoto(False, tk.PhotoImage(file=ICON_PATH), tk.PhotoImage(file=SMALL_ICON_PATH))
         mainWindow(new_root)
         new_root.mainloop()
 
@@ -604,9 +623,9 @@ class mainWindow:
                 if works:
                     break
             if works:
-                messagebox.showinfo(APP_NAME, f"This message is verified ✅\nTo come from the sender: " + correct["title"])
+                messagebox.showinfo(APP_NAME, f"This message is verified ✅\nto come from the sender: " + correct["title"])
             else:
-                messagebox.showinfo(APP_NAME, "This message is not verified❌ to come from any of your senders")
+                messagebox.showinfo(APP_NAME, "This message is not verified to come from any of your senders")
         except Exception as e:
             messagebox.showerror(APP_NAME, f"Decryption failed: {e}")
             return
@@ -624,10 +643,10 @@ class mainWindow:
 
     def saveAll(self):
         if encrypted:
-            pwd = simpledialog.askstring(APP_NAME, "Enter the master password")
+            pwd = simpledialog.askstring(APP_NAME, "Enter the master key to secure your data", show="*")
+            if pwd == "":
+                return
             salt = os.urandom(16)
-            with open(SALT_PATH, "wb") as f:
-                f.write(salt)
             kdf = PBKDF2HMAC(
                 hashes.SHA3_512(),
                 32,
@@ -638,7 +657,9 @@ class mainWindow:
             f = Fernet(key)
             with open(CONFIGENC_PATH, "w") as cnfenc:
                 with open(CONFIG_PATH, "r") as cnf:
-                    cnfenc.write(f.encrypt(cnf.read()).decode())
+                    cnfenc.write(f.encrypt(cnf.read().encode()).decode())
+            with open(SALT_PATH, "wb") as f:
+                f.write(salt)
         else:
             with open(CONFIG_PATH, "r") as cnf:
                 with open(CONFIGENC_PATH, "w") as cnfenc:
@@ -647,6 +668,20 @@ class mainWindow:
 
     def manage_keys(self):
         ManageKeysDialog(self.root)
+
+
+def wipe():
+    OVERWRITE_LEN = 1000000
+    with open(CONFIG_PATH, "wb") as f:
+        f.write(b"\x00" * OVERWRITE_LEN)
+        f.seek(0)
+        for i in range(1000):
+            f.write(os.urandom(int(OVERWRITE_LEN)))
+            f.flush()
+            f.seek(0)
+        f.write(b"\x00" * OVERWRITE_LEN)
+    with open(CONFIG_PATH, "w"):
+        pass
 
 def init():
     try:
@@ -674,32 +709,20 @@ def init():
             with open(CONFIGENC_PATH, "r") as cenc:
                 with open(CONFIG_PATH, "w") as file:
                     file.write(cenc.read())
+        return True
     except Exception:
         messagebox.showerror(
             APP_NAME,
             f"There was an error!{"\nYou may have entered the incorrect password." if encrypted else ""}",
         )
-    finally:
-        messagebox.showwarning(
-            APP_NAME,
-            "Press OK to start securly wiping key file(s)\nDo not end the program\nIt may take a while",
-        )
-        OVERWRITE_LEN = 1000000
-        with open(CONFIG_PATH, "wb") as f:
-            f.write(b"\x00" * OVERWRITE_LEN)
-            f.seek(0)
-            for i in range(100):
-                f.write(os.urandom(int(OVERWRITE_LEN)))
-                f.flush()
-                f.seek(0)
-            f.write(b"\x00" * OVERWRITE_LEN)
-        with open(CONFIG_PATH, "w"):
-            pass
-
-        messagebox.showinfo(APP_NAME, "Finished wiping file(s).")
+        return False
 
 if __name__ == "__main__":
-    init()
-    root = tk.Tk()
-    app = mainWindow(root)
-    root.mainloop()
+    if init():
+        root = tk.Tk()
+        large = tk.PhotoImage(file=ICON_PATH)
+        small = tk.PhotoImage(file=SMALL_ICON_PATH)
+        root.iconphoto(True, large, small)
+        app = mainWindow(root)
+        root.mainloop()
+        wipe()

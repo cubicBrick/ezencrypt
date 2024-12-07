@@ -9,3 +9,5 @@ Download python from [here](https://www.python.org/downloads/). Follow the direc
 ## Step 2: Setup Python Files and Libaries
 Open command prompt by pressing `⊞ Win` + `R` and typing `cmd`. Navigate to the folder where you downloaded this with `cd C:\the\path\where\this\is\installed`. 
 Run the python setup program with the command `python main.py`, and wait for it to complete.
+## Step 3: Run the Program!
+Follow the steps in step 2 to open a command prompt to the same directory, then run the command `cd ezencrypt`. To run the program, run the command `python main.py`.
