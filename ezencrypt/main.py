@@ -718,11 +718,11 @@ def init():
         return False
 
 if __name__ == "__main__":
+    root = tk.Tk()
+    large = tk.PhotoImage(file=ICON_PATH)
+    small = tk.PhotoImage(file=SMALL_ICON_PATH)
+    root.iconphoto(True, large, small)
     if init():
-        root = tk.Tk()
-        large = tk.PhotoImage(file=ICON_PATH)
-        small = tk.PhotoImage(file=SMALL_ICON_PATH)
-        root.iconphoto(True, large, small)
         app = mainWindow(root)
         root.mainloop()
         wipe()
