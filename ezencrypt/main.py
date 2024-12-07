@@ -363,7 +363,7 @@ class mainWindow:
 
     def removeMasterKey(self):
         global encrypted
-        checkStr = int.from_bytes(os.urandom(2))
+        checkStr = int.from_bytes(os.urandom(4))
         if not simpledialog.askstring(
             APP_NAME,
             "Are you sure you want to destroy your master key?\nType "
@@ -406,7 +406,6 @@ class mainWindow:
             self.root, APP_NAME, "Enter your text to encrypt"
         ).get_input()
         if not msg:
-            messagebox.showerror(APP_NAME, "No message provided for encryption!")
             return
 
         # Fetch available public keys
@@ -442,7 +441,6 @@ class mainWindow:
             select_dialog.destroy()
 
         tk.Button(select_dialog, text="OK", command=confirm_public_key_selection).pack(pady=5)
-
         # Wait for the dialog to close
         select_dialog.transient(self.root)
         self.root.wait_window(select_dialog)
@@ -635,7 +633,10 @@ class mainWindow:
         dialog.title("Decrypted Message")
         tk.Label(dialog, text="Your decrypted message:").pack(pady=10)
         text = tk.Text(dialog, wrap="word", width=80, height=10)
-        text.insert("1.0", decrypted_message)
+        try:
+            text.insert("1.0", decrypted_message)
+        except UnboundLocalError:
+            messagebox.showerror("Decryption failed!\nYou choose the wrong key, or this message was not for you")
         text.config(state="disabled")  # Make it read-only
         text.pack(pady=10)
         tk.Button(dialog, text="Close", command=dialog.destroy).pack(pady=5)
