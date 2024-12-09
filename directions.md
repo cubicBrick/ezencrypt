@@ -10,12 +10,12 @@ Open Software Center by pressing the `⊞ Win` key, then typeing `Software Cente
 Download python from [here](https://www.python.org/downloads/). Follow the directions on the website.
 ## Step 2: Setup Python Files and Libaries
 Open command prompt by pressing `⊞ Win` + `R` and typing `cmd`. Navigate to the folder where you downloaded this with `cd C:\the\path\where\this\is\installed`. 
-Run the python setup program with the command `python main.py`, and wait for it to complete.
+Run the python setup program with the command `python ezencrypt.py`, and wait for it to complete.
 ## Step 3: Run the Program!
 ### Option a) Run with python
-Follow the steps in step 2 to open a command prompt to the same directory, then run the command `cd ezencrypt`. To run the program, run the command `python main.py`.
+Follow the steps in step 2 to open a command prompt to the same directory, then run the command `cd ezencrypt`. To run the program, run the command `python ezencrypt.py`.
 ### Option b) Run with executable
-Follow the steps in step 2 to open a cocmmand prompt to the same directory, then run the command `main.exe`.
+Follow the steps in step 2 to open a cocmmand prompt to the same directory, then run the command `ezencrypt.exe`.
 
 # Instructions for usage
 
