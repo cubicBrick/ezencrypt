@@ -310,6 +310,7 @@ class mainWindow:
         self.saveallbutton = tk.Button(
             root, text="Save All Changes/Change Master Key", command=self.saveAll, width=40
         ).pack(pady=10)
+        self.root.protocol("WM_DELETE_WINDOW", self.onClose)
         if encrypted:
             tk.Button(
                 root, text="Remove Master Key", command=self.removeMasterKey, width=40
@@ -640,7 +641,14 @@ class mainWindow:
         text.config(state="disabled")  # Make it read-only
         text.pack(pady=10)
         tk.Button(dialog, text="Close", command=dialog.destroy).pack(pady=5)
-
+    def onClose(self):
+        res = messagebox.askyesnocancel(APP_NAME, "Do you want to save your changes?")
+        if res == None:
+            return
+        elif res:
+            self.saveAll()
+        self.root.destroy()
+        wipe()
 
     def saveAll(self):
         if encrypted:
