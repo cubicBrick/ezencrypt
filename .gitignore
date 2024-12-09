@@ -1,6 +1,9 @@
 __pycache__/
+build/
 *.pyc
 *.json
 *.txt
+*.spec
 !LICENSE.txt
+!version.txt
 !config
