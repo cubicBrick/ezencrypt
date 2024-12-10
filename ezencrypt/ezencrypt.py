@@ -164,7 +164,7 @@ class ManageKeysDialog(simpledialog.Dialog):
             password = simpledialog.askstring(
                 "Add Key", "Enter a password for the key:", show="*", parent=self
             )
-            if len(password < 1):
+            if len(password) < 1:
                 messagebox.showerror(APP_NAME, "You cannot have a blank password!")
                 return
             key = generate_private_key(public_exponent=65537, key_size=2048)
