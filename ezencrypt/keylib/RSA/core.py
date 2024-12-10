@@ -145,7 +145,7 @@ def verify_signature(public_key, message: bytes, signature: bytes) -> bool:
         return False
 
 
-def rsa_fernet_decrypt(private_key, public_key, encrypted_data: str) -> str:
+def rsa_fernet_decrypt(private_key, public_key, encrypted_data: str) -> tuple[str, bool]:
     """
     Decrypt a string message and verify its integrity and authenticity.
     
@@ -156,10 +156,7 @@ def rsa_fernet_decrypt(private_key, public_key, encrypted_data: str) -> str:
                               Fernet key, the Fernet-encrypted message, and the signature.
         
     Returns:
-        str: The decrypted original message if verification succeeds.
-        
-    Raises:
-        ValueError: If verification fails.
+        tuple: The decrypted original message, and if it is verified
     """
     # Split the encrypted data into components
     rsa_fernet_key_b64, fernet_encrypted_message_b64, signature_b64 = encrypted_data.split(":")
@@ -175,10 +172,6 @@ def rsa_fernet_decrypt(private_key, public_key, encrypted_data: str) -> str:
     message_hash = hashes.Hash(hashes.SHA256())
     message_hash.update(fernet_encrypted_message)
     digest = message_hash.finalize()
-
-    if not verify_signature(public_key, digest, signature):
-        raise ValueError("Signature verification failed!")
-
     # Decrypt the message using the Fernet key
-    return fernet.decrypt(fernet_encrypted_message).decode()
+    return (fernet.decrypt(fernet_encrypted_message).decode(), verify_signature(public_key, digest, signature)) 
 

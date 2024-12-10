@@ -164,6 +164,9 @@ class ManageKeysDialog(simpledialog.Dialog):
             password = simpledialog.askstring(
                 "Add Key", "Enter a password for the key:", show="*", parent=self
             )
+            if len(password < 1):
+                messagebox.showerror(APP_NAME, "You cannot have a blank password!")
+                return
             key = generate_private_key(public_exponent=65537, key_size=2048)
             key_bytes = key.private_bytes(
                 encoding=serialization.Encoding.PEM,
@@ -616,17 +619,17 @@ class mainWindow:
                     public_key = serialization.load_pem_public_key(public_key_pem.encode())
 
                     decrypted_message = rsa_fernet_decrypt(private_key, public_key, encrypted_message)
-                    works = True
+                    works = decrypted_message[1]
                     correct = public_key_data
                 except Exception: pass
                 if works:
                     break
             if works:
-                messagebox.showinfo(APP_NAME, f"This message is verified ✅\nto come from the sender: " + correct["title"])
+                messagebox.showinfo(APP_NAME, f"This message is verified to come from the sender: " + correct["title"])
             else:
                 messagebox.showinfo(APP_NAME, "This message is not verified to come from any of your senders")
-        except Exception as e:
-            messagebox.showerror(APP_NAME, f"Decryption failed: {e}")
+        except Exception:
+            messagebox.showerror(APP_NAME, "Decryption failed!")
             return
 
         # Display the decrypted message
@@ -635,9 +638,9 @@ class mainWindow:
         tk.Label(dialog, text="Your decrypted message:").pack(pady=10)
         text = tk.Text(dialog, wrap="word", width=80, height=10)
         try:
-            text.insert("1.0", decrypted_message)
+            text.insert("1.0", decrypted_message[0])
         except UnboundLocalError:
-            messagebox.showerror("Decryption failed!\nYou choose the wrong key, or this message was not for you")
+            messagebox.showerror("Decryption failed!\nYou choose the wrong key")
         text.config(state="disabled")  # Make it read-only
         text.pack(pady=10)
         tk.Button(dialog, text="Close", command=dialog.destroy).pack(pady=5)

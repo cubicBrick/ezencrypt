@@ -1,9 +1,6 @@
-__pycache__/
-build/
+ezencrypt/config/*
 *.pyc
-*.json
-*.txt
-*.spec
-!LICENSE.txt
-!version.txt
-!config
+*.cpython-312
+__pycache__
+!ezencrypt/config/a.tmp
+!*/
