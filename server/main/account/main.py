@@ -1,4 +1,4 @@
-#   add.py : This program manages adding a account to the server
+#   main.py : Contains a class for everythin account-related
 #   Copyright (C) 2024  cubicBrick (GitHub account)
 
 #   This program is free software: you can redistribute it and/or modify
@@ -13,16 +13,5 @@
 
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <https://www.gnu.org/licenses/>.
-from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey, RSAPublicKey
-from hashlib import pbkdf2_hmac
-import os
 
-HASH_ITERATIONS = 1_500_000
-
-class account:
-    def __init__(self, username : str, pwd : str, public: RSAPublicKey, privateHash: RSAPrivateKey):
-        self.username = username
-        self.salt = os.urandom(16)
-        self.pwdhash = pbkdf2_hmac("SHA3_512", pwd, self.salt, HASH_ITERATIONS)
-        self.public = public
-        
+class/
